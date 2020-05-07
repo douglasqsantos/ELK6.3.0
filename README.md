@@ -36,10 +36,12 @@
 - Elasticsearch
   - https://www.elastic.co/downloads/elasticsearch
   - https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-6.1.3.deb
+  - https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-6.8.8.deb
   - https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-7.6.2-amd64.deb
 - Kibana
   - https://www.elastic.co/downloads/kibana
   - https://artifacts.elastic.co/downloads/kibana/kibana-6.1.3-amd64.deb
+  - https://artifacts.elastic.co/downloads/kibana/kibana-6.8.8-amd64.deb
   - https://artifacts.elastic.co/downloads/kibana/kibana-7.6.2-amd64.deb
 
 
@@ -50,7 +52,7 @@ apt-get install openjdk-8-jre -y
 
 Elasticsearch installation
 ```bash
-dpkg -i elasticsearch-6.1.3.deb
+dpkg -i elasticsearch-6.8.8.deb
 ```
 
 Elasticsearch's configuration files
@@ -71,7 +73,7 @@ network.host: 192.168.0.30
 
 Installing Kibana from the deb package
 ```bash
-dpkg -i kibana-6.1.3-amd64.deb
+dpkg -i kibana-6.8.8-amd64.deb
 ```
 
 Kibana's Configuration files
@@ -82,7 +84,7 @@ total 8
 ```
 
 Configuring the Elasticsearch access from Kibana
-```
+```yaml
 vim /etc/kibana/kibana.yaml
 [...]
 server.host: "192.168.0.30"
@@ -149,15 +151,16 @@ Kibana url access: http://192.168.0.30:5601
 ## Agent Beats
 - https://www.elastic.co/downloads/beats
 - https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-6.1.3-amd64.deb
+- https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-6.1.3-amd64.deb
 - https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-7.6.2-amd64.deb
 
 Installing the Filebeat
 ```bash
-dpkg -i filebeat-6.1.3-amd64.deb
+dpkg -i filebeat-6.8.8-amd64.deb
 ```
 
 Filebeat basic configuration
-```bash
+```yaml
 vim /etc/filebeat/filebeat.yml
 [...]
 - type: log
@@ -251,17 +254,171 @@ drwxr-xr-x 6 elasticsearch elasticsearch 4096 May  7 11:55 mfFn-sKvSWCQCRc0SlC2a
 On Kibana interface select
 - Management
   - Index Patterns
+    - create index pattern
     - index pattern:
       - filebeat-*
         - Next Step
-      - Time Filter field name:L
+      - Time Filter field name:
         - @timestamp
           - Create index pattern
 
 On kibana interface
 - Discover
 
+## Logstash
+- Installing
+  - https://artifacts.elastic.co/downloads/logstash/logstash-6.4.2.deb
+  - https://artifacts.elastic.co/downloads/logstash/logstash-7.6.2.deb
+- Basic Configuration
+
+
+Installing the dependencies
+```bash
+apt-get install openjdk-8-jre -y
+```
+
+Instaling the logstash
+```bash
+dpkg -i logstash-6.4.2.deb
+```
+
+Logstash Basic Configuration 
+```bash
+vim /etc/logstash/logstash.yml
+[...]
+```
+
+Logstash pipeline
+```bash
+vim /etc/logstash/pipelines.yml
+```
+
+Lets create the rule on **Kibana/Dev Tools**
+
+On Sample Data use
+```bash
+May  7 13:33:25 kube-node01 sshd[1370]: Accepted publickey for root from 192.168.0.105 port 60560 ssh2: RSA SHA256:3w7NianF6lkwJbdBZK59l3XFe7fNFYVo2kkU6UWmvwU
+```
+
+On Grok Pattern use
+```
+%{DATA:time} kube-node01 %{WORD:program}\[%{NUMBER:pid:int}\]: %{DATA:msg} for %{DATA:user} from %{IPORHOST:source_ip} port %{NUMBER:port_number} %{WORD:service}: %{WORD:algo} %{GREEDYDATA:publickey}
+```
+
+Now select Simulate to check if all the information was correctly parsed
+
+**Some Examples:**
+- https://www.elastic.co/blog/grokking-the-linux-authorization-logs
+- https://github.com/thomaspatzke/logstash-linux
+- https://discuss.elastic.co/t/grokparsefailure-for-auth-log/104127/2
+- https://discuss.elastic.co/t/grokking-the-linux-authorization-logs/104467/5
+- https://www.elastic.co/guide/en/logstash/current/logstash-config-for-filebeat-modules.html
+
+Now on the server that was install logstash let's create the rule
+
+```bash
+vim /etc/logstash/conf.d/auth.conf
+input {
+  file {
+    path => [ "/var/log/auth.log" ]
+    type => "secure-log"
+    start_position => "beginning"
+    sincedb_path => "/dev/null"
+  }
+}
+
+filter {
+  if [type] == "secure-log" {
+    grok {
+      match => { "message" => "%{DATA:time} kube-node01 %{WORD:program}\[%{NUMBER:pid:int}\]: %{DATA:msg} for %{DATA:user} from %{IPORHOST:source_ip} port %{NUMBER:port_number} %{WORD:service}: %{WORD:algo} %{GREEDYDATA:publickey}" }
+      match => { "message" => "%{DATA:time} kube-node01 %{WORD:program}\[%{NUMBER:pid:int}\]: %{DATA:msg} for user %{DATA:user} by \(uid=%{NUMBER:uid}\)" }
+    }
+  }
+}
+
+output {
+  if [type] == "secure-log" {
+    elasticsearch {
+      hosts => ["192.168.0.30:9200"]
+      index => "secure-%{+YYYY.MM.dd}"
+    }
+  }
+}
+```
+
+Now let`s add the logstash to the root group, otherwise the logstash user will not be able to read the auth.log
+```bash
+usermod -aG root logstash
+usermod -aG adm logstash
+```
+
+Now we need to restart the logstash
+```bash
+systemctl restart logstash
+```
+
+Check the logstash status
+```bash
+systemctl status logstash
+```
+
+Checking the log file
+```bash
+tail -f /var/log/logstash/logstash-plain.log
+```
+
+On Kibana interface select
+- Management
+  - Index Patterns
+    - create index pattern
+    - index pattern:
+      - secure-*
+        - Next Step
+      - Time Filter field name:L
+        - @timestamp
+          - Create index pattern
+
+
+Another use
+```bash
+vim /etc/logstash/conf.d/auth.conf
+input {
+  file {
+    path => [ "/var/log/auth.log" ]
+    type => "secure-log"
+  }
+}
+
+filter {
+  if [type] == "secure-log" {
+    grok {
+      match => { "message" => ["%{SYSLOGTIMESTAMP:[system][auth][timestamp]} %{SYSLOGHOST:[system][auth][hostname]} sshd(?:\[%{POSINT:[system][auth][pid]}\])?: %{DATA:[system][auth][ssh][event]} %{DATA:[system][auth][ssh][method]} for (invalid user )?%{DATA:[system][auth][user]} from %{IPORHOST:[system][auth][ssh][ip]} port %{NUMBER:[system][auth][ssh][port]} ssh2(: %{GREEDYDATA:[system][auth][ssh][signature]})?",
+               "%{SYSLOGTIMESTAMP:[system][auth][timestamp]} %{SYSLOGHOST:[system][auth][hostname]} sshd(?:\[%{POSINT:[system][auth][pid]}\])?: %{DATA:[system][auth][ssh][event]} user %{DATA:[system][auth][user]} from %{IPORHOST:[system][auth][ssh][ip]}",
+               "%{SYSLOGTIMESTAMP:[system][auth][timestamp]} %{SYSLOGHOST:[system][auth][hostname]} sshd(?:\[%{POSINT:[system][auth][pid]}\])?: Did not receive identification string from %{IPORHOST:[system][auth][ssh][dropped_ip]}",
+               "%{SYSLOGTIMESTAMP:[system][auth][timestamp]} %{SYSLOGHOST:[system][auth][hostname]} sudo(?:\[%{POSINT:[system][auth][pid]}\])?: \s*%{DATA:[system][auth][user]} :( %{DATA:[system][auth][sudo][error]} ;)? TTY=%{DATA:[system][auth][sudo][tty]} ; PWD=%{DATA:[system][auth][sudo][pwd]} ; USER=%{DATA:[system][auth][sudo][user]} ; COMMAND=%{GREEDYDATA:[system][auth][sudo][command]}",
+               "%{SYSLOGTIMESTAMP:[system][auth][timestamp]} %{SYSLOGHOST:[system][auth][hostname]} groupadd(?:\[%{POSINT:[system][auth][pid]}\])?: new group: name=%{DATA:system.auth.groupadd.name}, GID=%{NUMBER:system.auth.groupadd.gid}",
+               "%{SYSLOGTIMESTAMP:[system][auth][timestamp]} %{SYSLOGHOST:[system][auth][hostname]} useradd(?:\[%{POSINT:[system][auth][pid]}\])?: new user: name=%{DATA:[system][auth][user][add][name]}, UID=%{NUMBER:[system][auth][user][add][uid]}, GID=%{NUMBER:[system][auth][user][add][gid]}, home=%{DATA:[system][auth][user][add][home]}, shell=%{DATA:[system][auth][user][add][shell]}$",
+               "%{SYSLOGTIMESTAMP:[system][auth][timestamp]} %{SYSLOGHOST:[system][auth][hostname]} %{DATA:[system][auth][program]}(?:\[%{POSINT:[system][auth][pid]}\])?: %{GREEDYMULTILINE:[system][auth][message]}"] }
+      pattern_definitions => {
+        "GREEDYMULTILINE"=> "(.|\n)*"
+      }
+    }
+  }
+}
+
+output {
+  if [type] == "secure-log" {
+    elasticsearch {
+      hosts => ["192.168.0.30:9200"]
+      index => "secure-%{+YYYY.MM.dd}"
+    }
+  }
+}
+```
 
 ## Elastic Courses
 - https://training.elastic.co/learn-from-home?baymax=rtp&elektra=home&storm=sub2&rogue=default&iesrc=ctr
+
+## OpenShift Portal
+- https://learn.openshift.com/
 
