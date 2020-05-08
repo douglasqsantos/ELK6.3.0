@@ -93,6 +93,12 @@ server.host: "192.168.0.30"
 elasticsearch.url: "http://192.168.0.30:9200"
 ```
 
+Enabling the service elasticsearch and kibana
+```bash
+systemctl enable elasticsearch
+systemctl enable kibana
+```
+
 Restarting the service elasticsearch and kibana
 ```bash
 systemctl restart elasticsearch
@@ -197,6 +203,11 @@ Restart the Filebeat Daemon
 systemctl restart filebeat
 ```
 
+Enabling the Filebeat
+```bash
+systemctl enable filebeat
+```
+
 Check the status of the Filebeat
 ```bash
 systemctl status filebeat
@@ -280,6 +291,11 @@ apt-get install openjdk-8-jre -y
 Instaling the logstash
 ```bash
 dpkg -i logstash-6.4.2.deb
+```
+
+Enabling the logstash
+```bash
+systemctl enable logstash
 ```
 
 Logstash Basic Configuration 
@@ -374,7 +390,7 @@ On Kibana interface select
     - index pattern:
       - secure-*
         - Next Step
-      - Time Filter field name:L
+      - Time Filter field name:
         - @timestamp
           - Create index pattern
 
@@ -414,6 +430,311 @@ output {
     }
   }
 }
+```
+
+## Logstash - Configuration
+
+- Pipelines
+- Input
+- Filter
+- Output
+- Sending logs via Rsyslog
+
+GROK Variables
+```
+USERNAME [a-zA-Z0-9._-]+
+USER %{USERNAME}
+INT (?:[+-]?(?:[0-9]+))
+BASE10NUM (?<![0-9.+-])(?>[+-]?(?:(?:[0-9]+(?:\.[0-9]+)?)|(?:\.[0-9]+)))
+NUMBER (?:%{BASE10NUM})
+BASE16NUM (?<![0-9A-Fa-f])(?:[+-]?(?:0x)?(?:[0-9A-Fa-f]+))
+BASE16FLOAT \b(?<![0-9A-Fa-f.])(?:[+-]?(?:0x)?(?:(?:[0-9A-Fa-f]+(?:\.[0-9A-Fa-f]*)?)|(?:\.[0-
+9A-Fa-f]+)))\b
+POSINT \b(?:[1-9][0-9]*)\b
+NONNEGINT \b(?:[0-9]+)\b
+WORD \b\w+\b
+NOTSPACE \S+
+SPACE \s*
+DATA .*?
+GREEDYDATA .*
+QUOTEDSTRING (?>(?<!\\)(?>"(?>\\.|[^\\"]+)+"|""|(?>'(?>\\.|[^\\']+)+')|''|(?>`(?>\\.|[^\\`]+)+`)|``))
+UUID [A-Fa-f0-9]{8}-(?:[A-Fa-f0-9]{4}-){3}[A-Fa-f0-9]{12}
+MAC (?:%{CISCOMAC}|%{WINDOWSMAC}|%{COMMONMAC})
+CISCOMAC (?:(?:[A-Fa-f0-9]{4}\.){2}[A-Fa-f0-9]{4})
+WINDOWSMAC (?:(?:[A-Fa-f0-9]{2}-){5}[A-Fa-f0-9]{2})
+COMMONMAC (?:(?:[A-Fa-f0-9]{2}:){5}[A-Fa-f0-9]{2})
+IPV6 ((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){6}(:[0-9A-Fa-f]{1,4}|
+((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:)
+{5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-
+9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|
+2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){3}(((:[0-
+9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-
+4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]
+{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9AFa-f]{1,4}:){1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-
+9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]
+{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)))(%.+)?
+IPV4 (?<![0-9])(?:(?:25[0-5]|2[0-4][0-9]|[0-1]?[0-9]{1,2})[.](?:25[0-5]|2[0-4][0-9]|[0-1]?[0-9]
+{1,2})[.](?:25[0-5]|2[0-4][0-9]|[0-1]?[0-9]{1,2})[.](?:25[0-5]|2[0-4][0-9]|[0-1]?[0-9]{1,2}))(?![0-
+9])
+IP (?:%{IPV6}|%{IPV4})
+HOSTNAME \b(?:[0-9A-Za-z][0-9A-Za-z-]{0,62})(?:\.(?:[0-9A-Za-z][0-9A-Za-z-]
+{0,62}))*(\.?|\b)
+HOST %{HOSTNAME}
+IPORHOST (?:%{HOSTNAME}|%{IP})
+HOSTPORT %{IPORHOST}:%{POSINT}
+PATH (?:%{UNIXPATH}|%{WINPATH})
+UNIXPATH (?>/(?>[\w_%!$@:.,-]+|\\.)*)+
+TTY (?:/dev/(pts|tty([pq])?)(\w+)?/?(?:[0-9]+))
+WINPATH (?>[A-Za-z]+:|\\)(?:\\[^\\?*]*)+
+URIPROTO [A-Za-z]+(\+[A-Za-z+]+)?
+URIHOST %{IPORHOST}(?::%{POSINT:port})?
+URIPATH (?:/[A-Za-z0-9$.+!*'(){},~:;=@#%_\-]*)+
+#URIPARAM \?(?:[A-Za-z0-9]+(?:=(?:[^&]*))?(?:&(?:[A-Za-z0-9]+(?:=(?:[^&]*))?)?)*)?
+URIPARAM \?[A-Za-z0-9$.+!*'|(){},~@#%&/=:;_?\-\[\]]*
+URIPATHPARAM %{URIPATH}(?:%{URIPARAM})?
+URI %{URIPROTO}://(?:%{USER}(?::[^@]*)?@)?(?:%{URIHOST})?(?:%
+{URIPATHPARAM})?
+MONTH \b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|
+Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\b
+MONTHNUM (?:0?[1-9]|1[0-2])
+MONTHNUM2 (?:0[1-9]|1[0-2])
+MONTHDAY (?:(?:0[1-9])|(?:[12][0-9])|(?:3[01])|[1-9])
+DAY (?:Mon(?:day)?|Tue(?:sday)?|Wed(?:nesday)?|Thu(?:rsday)?|Fri(?:day)?|Sat(?:urday)?|
+Sun(?:day)?)
+YEAR (?>\d\d){1,2}
+HOUR (?:2[0123]|[01]?[0-9])
+MINUTE (?:[0-5][0-9])
+SECOND (?:(?:[0-5]?[0-9]|60)(?:[:.,][0-9]+)?)
+TIME (?!<[0-9])%{HOUR}:%{MINUTE}(?::%{SECOND})(?![0-9])
+DATE_US %{MONTHNUM}[/-]%{MONTHDAY}[/-]%{YEAR}
+DATE_EU %{MONTHDAY}[./-]%{MONTHNUM}[./-]%{YEAR}
+ISO8601_TIMEZONE (?:Z|[+-]%{HOUR}(?::?%{MINUTE}))
+ISO8601_SECOND (?:%{SECOND}|60)
+TIMESTAMP_ISO8601 %{YEAR}-%{MONTHNUM}-%{MONTHDAY}[T ]%{HOUR}:?%
+{MINUTE}(?::?%{SECOND})?%{ISO8601_TIMEZONE}?
+DATE %{DATE_US}|%{DATE_EU}
+DATESTAMP %{DATE}[- ]%{TIME}
+TZ (?:[PMCE][SD]T|UTC)
+DATESTAMP_RFC822 %{DAY} %{MONTH} %{MONTHDAY} %{YEAR} %{TIME} %{TZ}
+DATESTAMP_RFC2822 %{DAY}, %{MONTHDAY} %{MONTH} %{YEAR} %{TIME} %
+{ISO8601_TIMEZONE}
+DATESTAMP_OTHER %{DAY} %{MONTH} %{MONTHDAY} %{TIME} %{TZ} %{YEAR}
+DATESTAMP_EVENTLOG %{YEAR}%{MONTHNUM2}%{MONTHDAY}%{HOUR}%
+{MINUTE}%{SECOND}
+SYSLOGTIMESTAMP %{MONTH} +%{MONTHDAY} %{TIME}
+PROG (?:[\w._/%-]+)
+SYSLOGPROG %{PROG:program}(?:\[%{POSINT:pid}\])?
+SYSLOGHOST %{IPORHOST}
+SYSLOGFACILITY <%{NONNEGINT:facility}.%{NONNEGINT:priority}>
+HTTPDATE %{MONTHDAY}/%{MONTH}/%{YEAR}:%{TIME} %{INT}
+SYSLOGBASE %{SYSLOGTIMESTAMP:timestamp} (?:%{SYSLOGFACILITY} )?%
+{SYSLOGHOST:logsource} %{SYSLOGPROG}:
+COMMONAPACHELOG %{IPORHOST:clientip} %{USER:ident} %{USER:auth} \[%
+{HTTPDATE:timestamp}\] "(?:%{WORD:verb} %{NOTSPACE:request}(?: HTTP/%
+{NUMBER:httpversion})?|%{DATA:rawrequest})" %{NUMBER:response} (?:%
+{NUMBER:bytes}|-)
+COMBINEDAPACHELOG %{COMMONAPACHELOG} %{QS:referrer} %{QS:agent}
+LOGLEVEL ([Aa]lert|ALERT|[Tt]race|TRACE|[Dd]ebug|DEBUG|[Nn]otice|NOTICE|[Ii]nfo|
+INFO|[Ww]arn?(?:ing)?|WARN?(?:ING)?|[Ee]rr?(?:or)?|ERR?(?:OR)?|[Cc]rit?(?:ical)?|CRIT?
+(?:ICAL)?|[Ff]atal|FATAL|[Ss]evere|SEVERE|EMERG(?:ENCY)?|[Ee]merg(?:ency)?)
+```
+
+## Logstash Pipelines
+
+- Elasticsearch server
+  - 192.168.0.30
+- Logstash Server
+  - 192.168.0.32
+- Linux Server
+  - 192.168.0.33
+
+## Logstash Instance
+  - Data Source ->
+  - Logstash Instance
+    - Input plugin
+    - filter plugin
+    - Output plugin
+  - -> Data Destination
+
+**Flow**
+```
+Linux Server --> Logstash Server -[documents]-> Elasticsearch Server
+```
+
+Configuring the jvm.options for logstash
+```bash
+vim /etc/logstash/jvm.options
+[...]
+## JVM configuration
+
+# Xms represents the initial size of total heap space
+# Xmx represents the maximum size of total heap space
+
+-Xms256m
+-Xmx256m
+```
+
+Let's create a iptables rule to filter the logs
+```bash
+iptables -I INPUT -p tcp --dport 22 -j LOG --log-prefix "Port 22 Access " --log-level warning
+```
+
+Take a look at the log
+```bash
+tail -n 10 /var/log/kern.log
+tail -n 10 /var/log/kern.log
+May  7 19:14:06 kube-node01 kernel: [ 7290.207849] Port 22 Access IN=enp0s3 OUT= MAC=08:00:27:e3:4e:38:08:00:27:69:64:7c SRC=192.168.0.105 DST=192.168.0.32 LEN=52 TOS=0x08 PREC=0x40 TTL=64 ID=0 DF PROTO=TCP SPT=63796 DPT=22 WINDOW=2047 RES=0x00 ACK URGP=0
+May  7 19:14:06 kube-node01 kernel: [ 7290.364019] Port 22 Access IN=enp0s3 OUT= MAC=08:00:27:e3:4e:38:08:00:27:69:64:7c SRC=192.168.0.105 DST=192.168.0.32 LEN=88 TOS=0x08 PREC=0x40 TTL=64 ID=0 DF PROTO=TCP SPT=63796 DPT=22 WINDOW=2048 RES=0x00 ACK PSH URGP=0
+May  7 19:14:06 kube-node01 kernel: [ 7290.370825] Port 22 Access IN=enp0s3 OUT= MAC=08:00:27:e3:4e:38:08:00:27:69:64:7c SRC=192.168.0.105 DST=192.168.0.32 LEN=52 TOS=0x08 PREC=0x40 TTL=64 ID=0 DF PROTO=TCP SPT=63796 DPT=22 WINDOW=2047 RES=0x00 ACK URGP=0
+May  7 19:14:06 kube-node01 kernel: [ 7290.484983] Port 22 Access IN=enp0s3 OUT= MAC=08:00:27:e3:4e:38:08:00:27:69:64:7c SRC=192.168.0.105 DST=192.168.0.32 LEN=88 TOS=0x08 PREC=0x40 TTL=64 ID=0 DF PROTO=TCP SPT=63796 DPT=22 WINDOW=2048 RES=0x00 ACK PSH URGP=0
+May  7 19:14:06 kube-node01 kernel: [ 7290.485522] Port 22 Access IN=enp0s3 OUT= MAC=08:00:27:e3:4e:38:08:00:27:69:64:7c SRC=192.168.0.105 DST=192.168.0.32 LEN=52 TOS=0x08 PREC=0x40 TTL=64 ID=0 DF PROTO=TCP SPT=63796 DPT=22 WINDOW=2047 RES=0x00 ACK URGP=0
+May  7 19:14:06 kube-node01 kernel: [ 7290.593421] Port 22 Access IN=enp0s3 OUT= MAC=08:00:27:e3:4e:38:08:00:27:69:64:7c SRC=192.168.0.105 DST=192.168.0.32 LEN=88 TOS=0x08 PREC=0x40 TTL=64 ID=0 DF PROTO=TCP SPT=63796 DPT=22 WINDOW=2048 RES=0x00 ACK PSH URGP=0
+May  7 19:14:06 kube-node01 kernel: [ 7290.594197] Port 22 Access IN=enp0s3 OUT= MAC=08:00:27:e3:4e:38:08:00:27:69:64:7c SRC=192.168.0.105 DST=192.168.0.32 LEN=52 TOS=0x08 PREC=0x40 TTL=64 ID=0 DF PROTO=TCP SPT=63796 DPT=22 WINDOW=2047 RES=0x00 ACK URGP=0
+May  7 19:14:07 kube-node01 kernel: [ 7290.751488] Port 22 Access IN=enp0s3 OUT= MAC=08:00:27:e3:4e:38:08:00:27:69:64:7c SRC=192.168.0.105 DST=192.168.0.32 LEN=88 TOS=0x08 PREC=0x40 TTL=64 ID=0 DF PROTO=TCP SPT=63796 DPT=22 WINDOW=2048 RES=0x00 ACK PSH URGP=0
+May  7 19:14:07 kube-node01 kernel: [ 7290.764976] Port 22 Access IN=enp0s3 OUT= MAC=08:00:27:e3:4e:38:08:00:27:69:64:7c SRC=192.168.0.105 DST=192.168.0.32 LEN=52 TOS=0x08 PREC=0x40 TTL=64 ID=0 DF PROTO=TCP SPT=63796 DPT=22 WINDOW=2047 RES=0x00 ACK URGP=0
+May  7 19:14:07 kube-node01 kernel: [ 7291.600907] Port 22 Access IN=enp0s3 OUT= MAC=08:00:27:e3:4e:38:08:00:27:69:64:7c SRC=192.168.0.105 DST=192.168.0.32 LEN=88 TOS=0x08 PREC=0x40 TTL=64 ID=0 DF PROTO=TCP SPT=63796 DPT=22 WINDOW=2048 RES=0x00 ACK PSH URGP=0
+```
+
+Creating the pipeline for the flow on the logstash server
+```bash
+vim /etc/logstash/conf.d/sysconf.conf
+input {
+
+  syslog {
+    port => 10514
+    type => "system-logs"
+  }
+
+  file {
+    path => [ "/var/log/kern.log" ]
+    type => "iptables-log"
+  }
+
+}
+
+
+filter {
+  if [type] == "iptables-log" {
+    grok {
+      match => { "message" =>  "%{SYSLOGTIMESTAMP:ipt_timestamp} %{SYSLOGHOST:srv_hostname} %{DATA:syslog_program}\: \[%{GREEDYDATA:ipt_id}\] %{GREEDYDATA:prefix} IN=%{GREEDYDATA:interface_in} OUT=%{GREEDYDATA:interface_out} MAC=%{GREEDYDATA:mac_adress} SRC=%{IP:source_ip} DST=%{IP:dest_ip} %{GREEDYDATA:text} DPT=%{INT:dest_port} %{GREEDYDATA:msg}" }
+      add_field => [ "receive_at", "%{@timestamp}" ]
+      add_field => [ "receive_from", "%{host}" ]
+    }
+    syslog_pri { }
+    date {
+      match => [ "ipt_timestamp", "MMM  d HH:mm:ss", "MMM dd HH:mm:ss" ]
+    }
+  }
+}
+
+output {
+
+  if [type] == "iptables-log" {
+    elasticsearch {
+      hosts => [ "192.168.0.30:9200" ]
+      index => "iptables-log-%{+YYYY.MM.dd}"
+    }
+  }
+
+  if [type] == "system-logs" {
+    elasticsearch {
+      hosts => [ "192.168.0.30:9200" ]
+      index => "system-logs-%{+YYYY.MM.dd}"
+    }
+  }
+
+}
+```
+
+Let's create another
+Creating the pipeline for the flow on the logstash server
+```bash
+vim /etc/logstash/conf.d/auth.conf
+input {
+  file {
+    path => [ "/var/log/auth.log" ]
+    type => "secure-log"
+  }
+}
+
+filter {
+  if [type] == "secure-log" {
+    grok {
+      match => { "message" => ["%{SYSLOGTIMESTAMP:[system][auth][timestamp]} %{SYSLOGHOST:[system][auth][hostname]} sshd(?:\[%{POSINT:[system][auth][pid]}\])?: %{DATA:[system][auth][ssh][event]} %{DATA:[system][auth][ssh][method]} for (invalid user )?%{DATA:[system][auth][user]} from %{IPORHOST:[system][auth][ssh][ip]} port %{NUMBER:[system][auth][ssh][port]} ssh2(: %{GREEDYDATA:[system][auth][ssh][signature]})?",
+               "%{SYSLOGTIMESTAMP:[system][auth][timestamp]} %{SYSLOGHOST:[system][auth][hostname]} sshd(?:\[%{POSINT:[system][auth][pid]}\])?: %{DATA:[system][auth][ssh][event]} user %{DATA:[system][auth][user]} from %{IPORHOST:[system][auth][ssh][ip]}",
+               "%{SYSLOGTIMESTAMP:[system][auth][timestamp]} %{SYSLOGHOST:[system][auth][hostname]} sshd(?:\[%{POSINT:[system][auth][pid]}\])?: Did not receive identification string from %{IPORHOST:[system][auth][ssh][dropped_ip]}",
+               "%{SYSLOGTIMESTAMP:[system][auth][timestamp]} %{SYSLOGHOST:[system][auth][hostname]} sudo(?:\[%{POSINT:[system][auth][pid]}\])?: \s*%{DATA:[system][auth][user]} :( %{DATA:[system][auth][sudo][error]} ;)? TTY=%{DATA:[system][auth][sudo][tty]} ; PWD=%{DATA:[system][auth][sudo][pwd]} ; USER=%{DATA:[system][auth][sudo][user]} ; COMMAND=%{GREEDYDATA:[system][auth][sudo][command]}",
+               "%{SYSLOGTIMESTAMP:[system][auth][timestamp]} %{SYSLOGHOST:[system][auth][hostname]} groupadd(?:\[%{POSINT:[system][auth][pid]}\])?: new group: name=%{DATA:system.auth.groupadd.name}, GID=%{NUMBER:system.auth.groupadd.gid}",
+               "%{SYSLOGTIMESTAMP:[system][auth][timestamp]} %{SYSLOGHOST:[system][auth][hostname]} useradd(?:\[%{POSINT:[system][auth][pid]}\])?: new user: name=%{DATA:[system][auth][user][add][name]}, UID=%{NUMBER:[system][auth][user][add][uid]}, GID=%{NUMBER:[system][auth][user][add][gid]}, home=%{DATA:[system][auth][user][add][home]}, shell=%{DATA:[system][auth][user][add][shell]}$",
+               "%{SYSLOGTIMESTAMP:[system][auth][timestamp]} %{SYSLOGHOST:[system][auth][hostname]} %{DATA:[system][auth][program]}(?:\[%{POSINT:[system][auth][pid]}\])?: %{GREEDYMULTILINE:[system][auth][message]}"] }
+      pattern_definitions => {
+        "GREEDYMULTILINE"=> "(.|\n)*"
+      }
+    }
+  }
+}
+
+
+output {
+  if [type] == "secure-log" {
+    elasticsearch {
+      hosts => ["192.168.0.30:9200"]
+      index => "secure-%{+YYYY.MM.dd}"
+    }
+  }
+}
+```
+
+
+Now on the Linux server
+```bash
+vim /etc/rsyslog.d/50-default.conf
+[...]
+*.* @@192.168.0.32:10514
+```
+
+Now let's restart the rsyslog
+```bash
+systemctl restart rsyslog
+```
+
+No on the Logstash Server
+```bash
+systemctl restart logstash
+```
+
+Now double check the log file
+```bash
+tail -f /var/log/logstash/logstash-plain.log
+```
+
+
+On Kibana interface select
+- Management
+  - Index Patterns
+    - create index pattern
+    - index pattern:
+      - system-logs-*
+        - Next Step
+      - Time Filter field name:
+        - @timestamp
+          - Create index pattern
+
+On Kibana interface select
+- Management
+  - Index Patterns
+    - create index pattern
+    - index pattern:
+      - iptables-log-*
+        - Next Step
+      - Time Filter field name:
+        - @timestamp
+          - Create index pattern
+
+
+Deleting an index with curl
+```bash
+curl -XDELETE 'http://192.168.0.30:9200/iptables-log'
 ```
 
 ## Elastic Courses
